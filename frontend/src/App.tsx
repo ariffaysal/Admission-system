@@ -1,14 +1,39 @@
-import { useCallback, useEffect, useState } from 'react'
-import './App.css'
-const API=import.meta.env.VITE_API_URL||'http://localhost:8080'
-type ClassItem={id:string;name:string;totalSeats:number;heldSeats:number;confirmedSeats:number;availableSeats:number}
-type Hold={holdId:string;classId:string;className:string;status:string;expiresAt:string}
-async function call<T>(path:string,student:string,init?:RequestInit):Promise<T>{const r=await fetch(`${API}${path}`,{...init,headers:{'Content-Type':'application/json','X-Student-Id':student,...init?.headers}});if(!r.ok){const b=await r.json().catch(()=>({}));throw new Error(b.error||`Request failed (${r.status})`)}return r.status===204?undefined as T:r.json()}
-export default function App(){const [student,setStudent]=useState(localStorage.getItem('studentId')||'');const [classes,setClasses]=useState<ClassItem[]>([]);const [holds,setHolds]=useState<Hold[]>([]);const [name,setName]=useState('');const [seats,setSeats]=useState(30);const [message,setMessage]=useState('');
- const refresh=useCallback(async()=>{try{const c=await fetch(`${API}/classes`).then(r=>r.json());setClasses(c);if(student.length>=5)setHolds(await call<Hold[]>('/me/holds',student))}catch(e){setMessage((e as Error).message)}},[student]);useEffect(()=>{void refresh();const t=setInterval(()=>void refresh(),5000);return()=>clearInterval(t)},[refresh]);
- async function act(fn:()=>Promise<unknown>){try{setMessage('');await fn();await refresh()}catch(e){setMessage((e as Error).message)}}function identify(v:string){setStudent(v);localStorage.setItem('studentId',v)}
- return <main><header><div><p className="eyebrow">SCHOOL ADMISSIONS</p><h1>Admission dashboard</h1><p>Browse available seats and manage your applications.</p></div><span className="badge">Live seat updates</span></header>
- <section className="identity"><label>Student birth registration number<input value={student} onChange={e=>identify(e.target.value)} placeholder="Enter 5–50 digit number" inputMode="numeric"/></label><p>Your application history is saved for this student number.</p></section>{message&&<div className="notice">{message}</div>}
- <section><div className="section-title"><p className="eyebrow">AVAILABLE PLACEMENTS</p><h2>Classes and shifts</h2></div><div className="cards">{classes.map(c=><article className="card" key={c.id}><h3>{c.name}</h3><p className="available">{c.availableSeats}<span> seats available</span></p><div className="stats"><span>Total {c.totalSeats}</span><span>Held {c.heldSeats}</span><span>Confirmed {c.confirmedSeats}</span></div><button disabled={student.length<5||c.availableSeats<1} onClick={()=>void act(()=>call(`/classes/${c.id}/holds`,student,{method:'POST'}))}>Reserve a seat</button></article>)}{classes.length===0&&<p className="empty">No classes yet. Add one using the administrator form below.</p>}</div></section>
- <section><div className="section-title"><p className="eyebrow">STUDENT RECORD</p><h2>My applications</h2></div>{holds.length===0?<p className="empty">No applications for this student number.</p>:<div className="table">{holds.map(h=><div className="row" key={h.holdId}><div><strong>{h.className}</strong><small>Reference {h.holdId.slice(0,8)} · Expires {new Date(h.expiresAt).toLocaleString()}</small></div><span className={`status ${h.status.toLowerCase()}`}>{h.status}</span><div className="actions"><button className="secondary" disabled={h.status!=='HELD'} onClick={()=>void act(()=>call(`/holds/${h.holdId}/confirm`,student,{method:'POST'}))}>Pay admission fee</button><button className="text" disabled={h.status!=='HELD'} onClick={()=>void act(()=>call(`/holds/${h.holdId}`,student,{method:'DELETE'}))}>Cancel</button></div></div>)}</div>}</section>
- <section className="admin"><div className="section-title"><p className="eyebrow">SCHOOL ADMIN</p><h2>Create a class</h2></div><form onSubmit={e=>{e.preventDefault();void act(async()=>{const r=await fetch(`${API}/classes`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,totalSeats:seats})});if(!r.ok)throw new Error((await r.json()).error||'Could not create class');setName('')})}}><label>Class and shift<input required maxLength={150} value={name} onChange={e=>setName(e.target.value)} placeholder="Class 6 — Morning Shift"/></label><label>Seat capacity<input required type="number" min="1" value={seats} onChange={e=>setSeats(Number(e.target.value))}/></label><button>Create class</button></form></section><footer>School Admission System · Seat information refreshes every 5 seconds</footer></main>}
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import AdmissionDashboard from './pages/AdmissionDashboard';
+import StudentIdPage from './pages/StudentIdPage';
+import MyApplications from './pages/MyApplications';
+import ReservationDetails from './pages/ReservationDetails';
+import AdminDashboard from './pages/AdminDashboard';
+import CreateClass from './pages/CreateClass';
+
+const App = () => {
+    return (
+        <BrowserRouter>
+            <div className="min-h-screen bg-gray-50 text-gray-900">
+                <nav className="bg-blue-700 text-white p-4 shadow-md flex justify-between items-center">
+                    <h1 className="text-xl font-bold">School Admission System</h1>
+                    <div className="space-x-4">
+                        <a href="/" className="hover:underline">Dashboard</a>
+                        <a href="/my-applications" className="hover:underline">My Applications</a>
+                        <a href="/admin" className="hover:underline">Admin</a>
+                    </div>
+                </nav>
+
+                <main className="container mx-auto p-4">
+                    <Routes>
+                        <Route path="/" element={<AdmissionDashboard />} />
+                        <Route path="/student-id" element={<StudentIdPage />} />
+                        <Route path="/my-applications" element={<MyApplications />} />
+                        <Route path="/reservation/:id" element={<ReservationDetails />} />
+                        <Route path="/admin" element={<AdminDashboard />} />
+                        <Route path="/admin/create-class" element={<CreateClass />} />
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </main>
+            </div>
+        </BrowserRouter>
+    );
+};
+
+export default App;
