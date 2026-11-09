@@ -1,19 +1,22 @@
 export interface ClassOffering {
     id: string;
-    className: string;
+    name: string;
     totalSeats: number;
+    heldSeats: number;
+    confirmedSeats: number;
     availableSeats: number;
 }
 
 export interface AdmissionHold {
-    id: string;
+    holdId: string;
     studentId: string;
-    classOfferingId: string;
+    classId: string;
+    className: string;
     expiresAt: string;
-    isConfirmed: boolean;
+    status: 'HELD' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED';
 }
 
 export interface CreateClassRequest {
-    className: string;
+    name: string;
     totalSeats: number;
 }

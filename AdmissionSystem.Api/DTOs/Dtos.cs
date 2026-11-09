@@ -2,20 +2,23 @@ using System;
 
 namespace AdmissionSystem.Api.DTOs
 {
-    public record CreateClassRequest(string ClassName, int TotalSeats);
+    public record CreateClassRequest(string Name, int TotalSeats);
 
     public record ClassOfferingDto(
         Guid Id,
-        string ClassName,
+        string Name,
         int TotalSeats,
+        int HeldSeats,
+        int ConfirmedSeats,
         int AvailableSeats
     );
 
     public record AdmissionHoldDto(
-        Guid Id,
+        Guid HoldId,
         string StudentId,
-        Guid ClassOfferingId,
+        Guid ClassId,
         DateTimeOffset ExpiresAt,
-        bool IsConfirmed
+        string Status,
+        string ClassName
     );
 }

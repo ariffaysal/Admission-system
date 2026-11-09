@@ -17,7 +17,7 @@ namespace AdmissionSystem.Api.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "8.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -37,8 +37,11 @@ namespace AdmissionSystem.Api.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsConfirmed")
-                        .HasColumnType("boolean");
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("HELD");
 
                     b.Property<string>("StudentId")
                         .IsRequired()
@@ -58,7 +61,7 @@ namespace AdmissionSystem.Api.Migrations
 
                     b.HasIndex("StudentId", "ClassOfferingId")
                         .IsUnique()
-                        .HasFilter("\"IsConfirmed\" = false");
+                        .HasFilter("\"Status\" IN ('HELD', 'CONFIRMED')");
 
                     b.ToTable("AdmissionHolds");
                 });
@@ -90,9 +93,10 @@ namespace AdmissionSystem.Api.Migrations
 
                     b.ToTable("ClassOfferings", t =>
                         {
-                            t.HasCheckConstraint("CK_ClassOffering_AvailableSeats_NonNegative", "available_seats >= 0");
+                            t.HasCheckConstraint("CK_ClassOffering_TotalSeats_Positive", "\"TotalSeats\" > 0");
+                            t.HasCheckConstraint("CK_ClassOffering_AvailableSeats_NonNegative", "\"AvailableSeats\" >= 0");
 
-                            t.HasCheckConstraint("CK_ClassOffering_SeatLimit", "available_seats <= total_seats");
+                            t.HasCheckConstraint("CK_ClassOffering_SeatLimit", "\"AvailableSeats\" <= \"TotalSeats\"");
                         });
                 });
 

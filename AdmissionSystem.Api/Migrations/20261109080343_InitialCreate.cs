@@ -25,8 +25,9 @@ namespace AdmissionSystem.Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ClassOfferings", x => x.Id);
-                    table.CheckConstraint("CK_ClassOffering_AvailableSeats_NonNegative", "available_seats >= 0");
-                    table.CheckConstraint("CK_ClassOffering_SeatLimit", "available_seats <= total_seats");
+                    table.CheckConstraint("CK_ClassOffering_TotalSeats_Positive", "\"TotalSeats\" > 0");
+                    table.CheckConstraint("CK_ClassOffering_AvailableSeats_NonNegative", "\"AvailableSeats\" >= 0");
+                    table.CheckConstraint("CK_ClassOffering_SeatLimit", "\"AvailableSeats\" <= \"TotalSeats\"");
                 });
 
             migrationBuilder.CreateTable(
@@ -36,7 +37,7 @@ namespace AdmissionSystem.Api.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     ClassOfferingId = table.Column<Guid>(type: "uuid", nullable: false),
                     StudentId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    IsConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false, defaultValue: "HELD"),
                     ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -72,7 +73,7 @@ namespace AdmissionSystem.Api.Migrations
                 table: "AdmissionHolds",
                 columns: new[] { "StudentId", "ClassOfferingId" },
                 unique: true,
-                filter: "\"IsConfirmed\" = false");
+                filter: "\"Status\" IN ('HELD', 'CONFIRMED')");
         }
 
         /// <inheritdoc />

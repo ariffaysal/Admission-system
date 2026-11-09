@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loading, ErrorMessage } from '../components/Common';
+
 
 const StudentIdPage = () => {
-    const [studentId, setStudentId] = useState('');
+    const [studentId, setStudentId] = useState(localStorage.getItem('student_id') ?? '');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleSave = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!studentId.trim()) return;
+        const normalized = studentId.trim();
+        if (!/^\d{5,50}$/.test(normalized)) return;
 
         setLoading(true);
-        localStorage.setItem('student_id', studentId.trim());
+        localStorage.setItem('student_id', normalized);
         setTimeout(() => {
             setLoading(false);
             navigate('/');
@@ -32,6 +33,10 @@ const StudentIdPage = () => {
                         className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                         placeholder="Enter your student ID"
                         required
+                        minLength={5}
+                        maxLength={50}
+                        pattern="[0-9]{5,50}"
+                        title="Enter 5 to 50 digits"
                     />
                 </div>
                 <button

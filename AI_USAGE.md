@@ -2,6 +2,7 @@
 
 ## Tools Used
 - **Claude Code (Anthropic)**: Primary agent for architecture, implementation, and orchestration.
+- **Codex (OpenAI)**: PRD compliance review and updates to reservation lifecycle, API contracts, database migrations, frontend integration, and automated tests.
 
 ## AI Contribution
 AI was used throughout the entire lifecycle of the project:
@@ -15,7 +16,7 @@ AI was used throughout the entire lifecycle of the project:
 Every piece of AI-generated code underwent the following process:
 1. **Static Analysis**: Code was reviewed for adherence to the provided technology stack (.NET 8, React 18).
 2. **Logic Verification**: The concurrency logic was specifically audited to ensure it prevented overbooking.
-3. **Testing**: Logic was verified using xUnit tests with `InMemoryDatabase` (for unit logic) and planned for PostgreSQL (for locking logic).
+3. **Testing**: Unit tests use EF Core InMemory for service behavior. The row-locking concurrency test runs against PostgreSQL when `TEST_DATABASE_URL` is provided; an InMemory database cannot prove PostgreSQL locking behavior.
 4. **Correction**: 
     - Modified the initial `AdmissionService` to fix a variable shadowing bug in the expiry loop.
     - Adjusted the frontend `App.tsx` to properly handle routing and navigation.

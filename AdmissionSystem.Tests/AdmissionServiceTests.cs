@@ -1,150 +1,118 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Xunit;
-using Moq;
-using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using AdmissionSystem.Api.Data;
+using AdmissionSystem.Api.DTOs;
 using AdmissionSystem.Api.Entities;
 using AdmissionSystem.Api.Services;
-using AdmissionSystem.Api.DTOs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
-namespace AdmissionSystem.Tests
+namespace AdmissionSystem.Tests;
+
+public class AdmissionServiceTests
 {
-    public class AdmissionServiceTests
+    private static AdmissionDbContext CreateContext(string name) => new(new DbContextOptionsBuilder<AdmissionDbContext>()
+        .UseInMemoryDatabase(name)
+        .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+        .Options);
+
+    [Fact]
+    public async Task CreateClassAndReserveSeat_ReturnsHoldAndDecrementsAvailability()
     {
-        private AdmissionDbContext GetDbContext()
+        var dbName = Guid.NewGuid().ToString();
+        await using var context = CreateContext(dbName);
+        var classes = new ClassService(context);
+        var item = await classes.CreateClassAsync(new CreateClassRequest("Class 6 - Morning Shift", 2));
+
+        var service = new AdmissionService(context);
+        var hold = await service.CreateHoldAsync(item.Id, "20152691234567890");
+        var updated = await classes.GetClassByIdAsync(item.Id);
+
+        Assert.Equal("HELD", hold.Status);
+        Assert.Equal(item.Id, hold.ClassId);
+        Assert.Equal(1, updated!.AvailableSeats);
+        Assert.Equal(1, updated.HeldSeats);
+    }
+
+    [Fact]
+    public async Task ConfirmationIsIdempotentAndPreventsSecondActiveApplication()
+    {
+        await using var context = CreateContext(Guid.NewGuid().ToString());
+        var classService = new ClassService(context);
+        var item = await classService.CreateClassAsync(new CreateClassRequest("Class 7 - Day Shift", 2));
+        var admissions = new AdmissionService(context);
+        var hold = await admissions.CreateHoldAsync(item.Id, "20152691234567891");
+
+        var first = await admissions.ConfirmHoldAsync(hold.HoldId, hold.StudentId);
+        var second = await admissions.ConfirmHoldAsync(hold.HoldId, hold.StudentId);
+        var updatedClass = await classService.GetClassByIdAsync(item.Id);
+
+        Assert.Equal("CONFIRMED", first.Status);
+        Assert.Equal("CONFIRMED", second.Status);
+        Assert.Equal(1, updatedClass!.ConfirmedSeats);
+        Assert.Equal(1, updatedClass.AvailableSeats);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => admissions.CreateHoldAsync(item.Id, hold.StudentId));
+    }
+
+    [Fact]
+    public async Task ExpiredHoldIsMarkedAndItsSeatIsReleased()
+    {
+        await using var context = CreateContext(Guid.NewGuid().ToString());
+        var item = new ClassOffering { Id = Guid.NewGuid(), ClassName = "Class 8", TotalSeats = 1, AvailableSeats = 0 };
+        var hold = new AdmissionHold { Id = Guid.NewGuid(), ClassOfferingId = item.Id, ClassOffering = item, StudentId = "20152691234567892", ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1), Status = "HELD" };
+        context.AddRange(item, hold);
+        await context.SaveChangesAsync();
+
+        await new AdmissionService(context).ExpireAllAsync();
+
+        Assert.Equal("EXPIRED", (await context.AdmissionHolds.SingleAsync()).Status);
+        Assert.Equal(1, (await context.ClassOfferings.SingleAsync()).AvailableSeats);
+    }
+}
+
+public sealed class PostgresRequiredFactAttribute : FactAttribute
+{
+    public PostgresRequiredFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TEST_DATABASE_URL")))
+            Skip = "Set TEST_DATABASE_URL to a disposable PostgreSQL database to run the row-locking concurrency test.";
+    }
+}
+
+public class ReservationConcurrencyTests
+{
+    [PostgresRequiredFact]
+    public async Task ConcurrentReservationsNeverExceedCapacity()
+    {
+        var connection = Environment.GetEnvironmentVariable("TEST_DATABASE_URL")!;
+        var options = new DbContextOptionsBuilder<AdmissionDbContext>().UseNpgsql(connection).Options;
+        var classId = Guid.NewGuid();
+        await using (var setup = new AdmissionDbContext(options))
         {
-            var options = new DbContextOptionsBuilder<AdmissionDbContext>()
-                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
-                .Options;
-            return new AdmissionDbContext(options);
+            await setup.Database.EnsureCreatedAsync();
+            setup.ClassOfferings.Add(new ClassOffering { Id = classId, ClassName = "Concurrency Test", TotalSeats = 10, AvailableSeats = 10 });
+            await setup.SaveChangesAsync();
         }
 
-        [Fact]
-        public async Task CreateHold_ShouldDecrementAvailableSeats()
+        var results = await Task.WhenAll(Enumerable.Range(0, 100).Select(async index =>
         {
-            // Arrange
-            using var context = GetDbContext();
-            var classOffering = new ClassOffering
+            await using var db = new AdmissionDbContext(options);
+            try
             {
-                Id = Guid.NewGuid(),
-                ClassName = "Test Class",
-                TotalSeats = 10,
-                AvailableSeats = 10
-            };
-            context.ClassOfferings.Add(classOffering);
-            await context.SaveChangesAsync();
+                await new AdmissionService(db).CreateHoldAsync(classId, $"{10000000 + index}");
+                return true;
+            }
+            catch (SeatUnavailableException) { return false; }
+            catch (InvalidOperationException) { return false; }
+        }));
 
-            var service = new AdmissionService(context);
-            string studentId = "student123";
-
-            // Act
-            var result = await service.CreateHoldAsync(classOffering.Id, studentId);
-
-            // Assert
-            result.Should().NotBeNull();
-            var updatedClass = await context.ClassOfferings.FindAsync(classOffering.Id);
-            updatedClass.AvailableSeats.Should().Be(9);
-        }
-
-        [Fact]
-        public async Task CreateHold_ShouldFail_WhenNoSeatsAvailable()
+        await using (var verify = new AdmissionDbContext(options))
         {
-            // Arrange
-            using var context = GetDbContext();
-            var classOffering = new ClassOffering
-            {
-                Id = Guid.NewGuid(),
-                ClassName = "Full Class",
-                TotalSeats = 1,
-                AvailableSeats = 0
-            };
-            context.ClassOfferings.Add(classOffering);
-            await context.SaveChangesAsync();
-
-            var service = new AdmissionService(context);
-
-            // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                service.CreateHoldAsync(classOffering.Id, "student123"));
-        }
-
-        [Fact]
-        public async Task ConfirmHold_ShouldBeIdempotent()
-        {
-            // Arrange
-            using var context = GetDbContext();
-            var classId = Guid.NewGuid();
-            var classOffering = new ClassOffering
-            {
-                Id = classId,
-                ClassName = "Test Class",
-                TotalSeats = 10,
-                AvailableSeats = 10
-            };
-            context.ClassOfferings.Add(classOffering);
-
-            var hold = new AdmissionHold
-            {
-                Id = Guid.NewGuid(),
-                ClassOfferingId = classId,
-                StudentId = "student123",
-                IsConfirmed = false,
-                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(10)
-            };
-            context.AdmissionHolds.Add(hold);
-            await context.SaveChangesAsync();
-
-            var service = new AdmissionService(context);
-
-            // Act
-            await service.ConfirmHoldAsync(hold.Id, "student123");
-            await service.ConfirmHoldAsync(hold.Id, "student123"); // Second call
-
-            // Assert
-            var updatedHold = await context.AdmissionHolds.FindAsync(hold.Id);
-            updatedHold.IsConfirmed.Should().BeTrue();
-        }
-
-        [Fact]
-        public async Task CreateHold_ShouldReleaseExpiredSeats()
-        {
-            // Arrange
-            using var context = GetDbContext();
-            var classId = Guid.NewGuid();
-            var classOffering = new ClassOffering
-            {
-                Id = classId,
-                ClassName = "Test Class",
-                TotalSeats = 1,
-                AvailableSeats = 0
-            };
-            context.ClassOfferings.Add(classOffering);
-
-            var expiredHold = new AdmissionHold
-            {
-                Id = Guid.NewGuid(),
-                ClassOfferingId = classId,
-                StudentId = "oldStudent",
-                IsConfirmed = false,
-                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1) // Expired
-            };
-            context.AdmissionHolds.Add(expiredHold);
-            await context.SaveChangesAsync();
-
-            var service = new AdmissionService(context);
-
-            // Act
-            var result = await service.CreateHoldAsync(classId, "newStudent");
-
-            // Assert
-            result.Should().NotBeNull();
-            var updatedClass = await context.ClassOfferings.FindAsync(classId);
-            updatedClass.AvailableSeats.Should().Be(0); // 0 + 1 (released) - 1 (new) = 0
+            Assert.Equal(10, results.Count(x => x));
+            var item = await verify.ClassOfferings.SingleAsync(c => c.Id == classId);
+            Assert.Equal(10, await verify.AdmissionHolds.CountAsync(h => h.ClassOfferingId == classId && h.Status == "HELD"));
+            Assert.InRange(item.AvailableSeats, 0, item.TotalSeats);
+            Assert.Equal(item.TotalSeats, item.AvailableSeats + await verify.AdmissionHolds.CountAsync(h => h.ClassOfferingId == classId && (h.Status == "HELD" || h.Status == "CONFIRMED")));
+            verify.Remove(item);
+            await verify.SaveChangesAsync();
         }
     }
 }

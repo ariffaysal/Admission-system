@@ -21,10 +21,12 @@ namespace AdmissionSystem.Api.Data
                 entity.Property(e => e.ClassName).IsRequired().HasMaxLength(255);
 
                 // Constraint: AvailableSeats cannot be negative
-                entity.ToTable(t => t.HasCheckConstraint("CK_ClassOffering_AvailableSeats_NonNegative", "available_seats >= 0"));
-
-                // Constraint: AvailableSeats cannot exceed TotalSeats
-                entity.ToTable(t => t.HasCheckConstraint("CK_ClassOffering_SeatLimit", "available_seats <= total_seats"));
+                entity.ToTable(t =>
+                {
+                    t.HasCheckConstraint("CK_ClassOffering_TotalSeats_Positive", "\"TotalSeats\" > 0");
+                    t.HasCheckConstraint("CK_ClassOffering_AvailableSeats_NonNegative", "\"AvailableSeats\" >= 0");
+                    t.HasCheckConstraint("CK_ClassOffering_SeatLimit", "\"AvailableSeats\" <= \"TotalSeats\"");
+                });
             });
 
             // AdmissionHold configuration
@@ -32,6 +34,7 @@ namespace AdmissionSystem.Api.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.StudentId).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(20).HasDefaultValue("HELD");
 
                 entity.HasOne(h => h.ClassOffering)
                       .WithMany(c => c.Holds)
@@ -41,7 +44,7 @@ namespace AdmissionSystem.Api.Data
                 // Partial Unique Index: A student can only have one active (unconfirmed) hold per class
                 entity.HasIndex(h => new { h.StudentId, h.ClassOfferingId })
                       .IsUnique()
-                      .HasFilter("\"IsConfirmed\" = false");
+                      .HasFilter("\"Status\" IN ('HELD', 'CONFIRMED')");
 
                 // Indices for performance
                 entity.HasIndex(h => h.StudentId);

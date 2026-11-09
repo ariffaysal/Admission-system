@@ -21,7 +21,7 @@ namespace AdmissionSystem.Api.Entities
         public Guid ClassOfferingId { get; set; }
         public virtual ClassOffering ClassOffering { get; set; } = null!;
         public string StudentId { get; set; } = string.Empty;
-        public bool IsConfirmed { get; set; }
+        public string Status { get; set; } = "HELD";
         public DateTimeOffset ExpiresAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

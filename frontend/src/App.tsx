@@ -1,5 +1,4 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import AdmissionDashboard from './pages/AdmissionDashboard';
 import StudentIdPage from './pages/StudentIdPage';
 import MyApplications from './pages/MyApplications';
@@ -22,18 +21,18 @@ const App = () => {
                             <h1 className="text-xl font-bold tracking-tight">School Admission</h1>
                         </div>
                         <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
-                            <a href="/" className="hover:text-blue-400 transition-colors flex items-center space-x-1">
+                            <Link to="/" className="hover:text-blue-400 transition-colors flex items-center space-x-1">
                                 <LayoutDashboard className="h-4 w-4" />
                                 <span>Dashboard</span>
-                            </a>
-                            <a href="/my-applications" className="hover:text-blue-400 transition-colors flex items-center space-x-1">
+                            </Link>
+                            <Link to="/my-applications" className="hover:text-blue-400 transition-colors flex items-center space-x-1">
                                 <UserCircle className="h-4 w-4" />
                                 <span>My Applications</span>
-                            </a>
-                            <a href="/admin" className="hover:text-blue-400 transition-colors flex items-center space-x-1">
+                            </Link>
+                            <Link to="/admin" className="hover:text-blue-400 transition-colors flex items-center space-x-1">
                                 <Settings className="h-4 w-4" />
                                 <span>Admin</span>
-                            </a>
+                            </Link>
                         </div>
                     </div>
                 </nav>

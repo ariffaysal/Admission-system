@@ -1,6 +1,14 @@
-@AdmissionSystem.Api_HostAddress = http://localhost:5128
+@AdmissionSystem.Api_HostAddress = http://localhost:8080
 
-GET {{AdmissionSystem.Api_HostAddress}}/weatherforecast/
+GET {{AdmissionSystem.Api_HostAddress}}/classes
 Accept: application/json
 
 ###
+
+POST {{AdmissionSystem.Api_HostAddress}}/classes
+Content-Type: application/json
+
+{
+  "name": "Class 6 - Morning Shift",
+  "totalSeats": 120
+}

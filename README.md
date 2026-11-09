@@ -14,7 +14,7 @@ A complete school admission system built with .NET 8, React, and PostgreSQL, des
 - **Backend**: .NET 8 Web API, Entity Framework Core
 - **Database**: PostgreSQL
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Axios
-- **Testing**: xUnit, FluentAssertions
+- **Testing**: xUnit with EF Core InMemory unit tests and an opt-in PostgreSQL concurrency test
 - **Infrastructure**: Docker, Docker Compose
 
 ## 📁 Project Structure
@@ -47,6 +47,7 @@ A complete school admission system built with .NET 8, React, and PostgreSQL, des
 
 2. Start the entire stack:
    ```bash
+   cp .env.example .env
    docker compose up -d
    ```
 
@@ -78,6 +79,12 @@ dotnet test AdmissionSystem.Tests/AdmissionSystem.Tests.csproj
 ## ⚙️ Environment Variables
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | `Host=localhost;...` | PostgreSQL connection string |
+| `DATABASE_URL` | `Host=db;Database=admission_db;...` | PostgreSQL connection string used by Compose |
 | `VITE_API_URL` | `http://localhost:8080` | Frontend API endpoint |
 | `HOLD_DURATION_SECONDS`| `600` | Duration of seat reservations |
+
+`VITE_API_URL` is a frontend build-time setting. Set it in `.env` before running `docker compose up --build` when the API is hosted at a different browser-accessible URL. `DATABASE_URL` in the Compose environment should use the `db` service hostname (as in `.env.example`).
+
+### Automated tests
+
+Run the unit tests with `dotnet test AdmissionSystem.Tests/AdmissionSystem.Tests.csproj`. The PostgreSQL row-locking concurrency test runs when `TEST_DATABASE_URL` points to a disposable PostgreSQL database; otherwise xUnit reports it as skipped.

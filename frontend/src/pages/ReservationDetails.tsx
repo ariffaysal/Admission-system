@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { admissionApi } from '../api/services';
-import { AdmissionHold } from '../types';
+import { type AdmissionHold } from '../types';
 import { Loading, ErrorMessage } from '../components/Common';
-import { Timer, CheckCircle, XCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Timer, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -20,8 +20,7 @@ const ReservationDetails = () => {
             try {
                 const data = await admissionApi.getHold(id!);
                 setHold(data);
-                const expiry = new Date(data.expiresAt).getTime();
-                setTimeLeft(Math.max(0, Math.floor((expiry - Date.now()) / 1000)));
+                setTimeLeft(data.status === 'HELD' ? Math.max(0, Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000)) : 0);
             } catch (err: any) {
                 setError(err.message || 'Failed to load reservation');
             } finally {
@@ -29,12 +28,13 @@ const ReservationDetails = () => {
             }
         };
         fetchHold();
+        const refresh = setInterval(fetchHold, 5000);
 
         const timer = setInterval(() => {
             setTimeLeft(prev => (prev !== null && prev > 0) ? prev - 1 : 0);
         }, 1000);
 
-        return () => clearInterval(timer);
+        return () => { clearInterval(timer); clearInterval(refresh); };
     }, [id]);
 
     const formatTime = (seconds: number) => {
@@ -51,11 +51,12 @@ const ReservationDetails = () => {
 
     const handleConfirm = async () => {
         try {
-            await admissionApi.confirm(id!);
+            const updated = await admissionApi.confirm(id!);
+            setHold(updated);
             toast.success('Admission Confirmed Successfully!');
             navigate('/my-applications');
         } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Confirmation failed');
+            toast.error(err.response?.data?.error || 'Confirmation failed');
         }
     };
 
@@ -66,7 +67,7 @@ const ReservationDetails = () => {
             toast.success('Reservation cancelled');
             navigate('/my-applications');
         } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Cancellation failed');
+            toast.error(err.response?.data?.error || 'Cancellation failed');
         }
     };
 
@@ -74,7 +75,8 @@ const ReservationDetails = () => {
     if (error) return <ErrorMessage message={error} />;
     if (!hold) return <ErrorMessage message="Reservation not found" />;
 
-    const isExpired = timeLeft === 0;
+    const isExpired = hold.status === 'EXPIRED' || (hold.status === 'HELD' && timeLeft === 0);
+    const isConfirmed = hold.status === 'CONFIRMED';
 
     return (
         <div className="max-w-2xl mx-auto space-y-8">
@@ -91,15 +93,15 @@ const ReservationDetails = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 className="bg-white rounded-3xl shadow-xl border border-academic-200 overflow-hidden"
             >
-                <div className={`p-8 text-center ${hold.isConfirmed ? 'bg-success-500 text-white' : 'bg-academic-800 text-white'}`}>
+                <div className={`p-8 text-center ${isConfirmed ? 'bg-success-500 text-white' : 'bg-academic-800 text-white'}`}>
                     <div className="inline-flex p-3 bg-white/20 rounded-full mb-4">
-                        {hold.isConfirmed ? <CheckCircle className="h-8 w-8" /> : <Timer className="h-8 w-8" />}
+                        {isConfirmed ? <CheckCircle className="h-8 w-8" /> : <Timer className="h-8 w-8" />}
                     </div>
                     <h2 className="text-3xl font-bold mb-2">
-                        {hold.isConfirmed ? 'Admission Confirmed!' : 'Seat Reserved'}
+                        {isConfirmed ? 'Admission Confirmed!' : hold.status === 'HELD' ? 'Seat Reserved' : `Reservation ${hold.status.toLowerCase()}`}
                     </h2>
                     <p className="opacity-90">
-                        {hold.isConfirmed
+                        {isConfirmed
                             ? 'Your child is now officially enrolled.'
                             : 'Please confirm your admission within the time limit.'}
                     </p>
@@ -109,17 +111,17 @@ const ReservationDetails = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div className="p-4 bg-academic-50 rounded-2xl border border-academic-100">
                             <p className="text-xs text-academic-500 uppercase font-bold mb-1">Reservation ID</p>
-                            <p className="font-mono text-sm font-semibold">{hold.id}</p>
+                            <p className="font-mono text-sm font-semibold">{hold.holdId}</p>
                         </div>
                         <div className="p-4 bg-academic-50 rounded-2xl border border-academic-100">
                             <p className="text-xs text-academic-500 uppercase font-bold mb-1">Status</p>
-                            <p className={`font-bold ${hold.isConfirmed ? 'text-success-600' : isExpired ? 'text-danger-600' : 'text-blue-600'}`}>
-                                {hold.isConfirmed ? 'CONFIRMED' : isExpired ? 'EXPIRED' : 'HELD'}
+                            <p className={`font-bold ${isConfirmed ? 'text-success-600' : isExpired ? 'text-danger-600' : 'text-blue-600'}`}>
+                                {isExpired ? 'EXPIRED' : hold.status}
                             </p>
                         </div>
                     </div>
 
-                    {!hold.isConfirmed && (
+                    {hold.status === 'HELD' && (
                         <div className="flex flex-col items-center justify-center p-6 bg-academic-100 rounded-2xl border-2 border-dashed border-academic-300">
                             <p className="text-sm text-academic-500 mb-2">Reservation Expires In</p>
                             <p className={`text-5xl font-black font-mono ${getTimeColor(timeLeft || 0)}`}>
@@ -135,7 +137,7 @@ const ReservationDetails = () => {
                     )}
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                        {!hold.isConfirmed && !isExpired && (
+                        {hold.status === 'HELD' && !isExpired && (
                             <button
                                 onClick={handleConfirm}
                                 className="flex-1 bg-success-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-success-700 transition-all shadow-lg hover:shadow-success-200 active:scale-95"
@@ -145,7 +147,7 @@ const ReservationDetails = () => {
                         )}
                         <button
                             onClick={handleCancel}
-                            disabled={hold.isConfirmed}
+                            disabled={hold.status !== 'HELD'}
                             className="flex-1 bg-white text-gray-600 border border-gray-300 py-4 rounded-xl font-bold hover:bg-gray-50 transition-all disabled:opacity-50"
                         >
                             Cancel Reservation

@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     container_name: admission-db
     environment:
-      POSTGRES_DB: admission_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-admission_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
@@ -24,7 +24,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=Host=db;Database=admission_db;Username=postgres;Password=postgres
+      DATABASE_URL: ${DATABASE_URL:-Host=db;Database=admission_db;Username=postgres;Password=postgres}
+      HOLD_DURATION_SECONDS: ${HOLD_DURATION_SECONDS:-600}
     depends_on:
       db:
         condition: service_healthy
@@ -33,11 +34,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
     container_name: admission-web
     ports:
       - "5173:80"
-    environment:
-      - VITE_API_URL=http://localhost:8080
     depends_on:
       - backend
 

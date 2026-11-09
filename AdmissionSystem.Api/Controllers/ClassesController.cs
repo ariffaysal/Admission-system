@@ -42,7 +42,7 @@ namespace AdmissionSystem.Api.Controllers
         public async Task<IActionResult> GetById(Guid id)
         {
             var result = await _classService.GetClassByIdAsync(id);
-            if (result == null) return NotFound();
+            if (result == null) return NotFound(new { error = "Class not found." });
             return Ok(result);
         }
     }

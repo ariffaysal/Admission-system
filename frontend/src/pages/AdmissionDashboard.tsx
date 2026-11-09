@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { classApi } from '../api/services';
-import { ClassOffering } from '../types';
+import { admissionApi, classApi } from '../api/services';
+import { type ClassOffering } from '../types';
 import { Loading, ErrorMessage } from '../components/Common';
-import { BookOpen, Users, ArrowRight, Info } from 'lucide-react';
+import { BookOpen, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -14,17 +14,20 @@ const AdmissionDashboard = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
+        let active = true;
         const fetchClasses = async () => {
             try {
                 const data = await classApi.getAll();
-                setClasses(data);
+                if (active) { setClasses(data); setError(null); }
             } catch (err: any) {
-                setError(err.message || 'Failed to load classes');
+                if (active) setError(err.response?.data?.error || err.message || 'Failed to load classes');
             } finally {
-                setLoading(false);
+                if (active) setLoading(false);
             }
         };
         fetchClasses();
+        const refresh = setInterval(fetchClasses, 5000);
+        return () => { active = false; clearInterval(refresh); };
     }, []);
 
     const handleReserve = async (classId: string) => {
@@ -36,10 +39,9 @@ const AdmissionDashboard = () => {
         }
 
         try {
-            const api = (await import('../api/axios')).default;
-            const { data: hold } = await api.post(`/classes/${classId}/holds`);
+            const hold = await admissionApi.createHold(classId);
             toast.success('Seat reserved successfully!');
-            navigate(`/reservation/${hold.id}`);
+            navigate(`/reservation/${hold.holdId}`);
         } catch (err: any) {
             toast.error(err.response?.data?.message || 'Reservation failed');
         }
@@ -79,12 +81,16 @@ const AdmissionDashboard = () => {
                                 </span>
                             </div>
 
-                            <h3 className="text-xl font-bold text-academic-900 mb-4">{cls.className}</h3>
+                            <h3 className="text-xl font-bold text-academic-900 mb-4">{cls.name}</h3>
 
                             <div className="space-y-4 mb-6">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-academic-500">Capacity</span>
                                     <span className="font-semibold text-academic-800">{cls.totalSeats} Seats</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-academic-500">Held / Confirmed</span>
+                                    <span className="font-semibold text-academic-800">{cls.heldSeats} / {cls.confirmedSeats}</span>
                                 </div>
                                 <div className="w-full bg-academic-100 h-2 rounded-full overflow-hidden">
                                     <div

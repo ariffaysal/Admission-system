@@ -1,5 +1,5 @@
 import api from './axios';
-import { ClassOffering, CreateClassRequest, AdmissionHold } from '../types';
+import { type ClassOffering, type CreateClassRequest, type AdmissionHold } from '../types';
 
 export const classApi = {
     getAll: async () => {
@@ -26,7 +26,8 @@ export const admissionApi = {
         return data;
     },
     confirm: async (holdId: string) => {
-        await api.post(`/holds/${holdId}/confirm`);
+        const { data } = await api.post<AdmissionHold>(`/holds/${holdId}/confirm`);
+        return data;
     },
     cancel: async (holdId: string) => {
         await api.delete(`/holds/${holdId}`);

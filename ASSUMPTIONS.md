@@ -12,18 +12,19 @@ Identification is handled via the `X-Student-Id` HTTP header.
 - This simplifies the process for the assignment while demonstrating how to implement identity-based requests.
 
 ## 3. Cancellation Behavior
-- **Cancellable**: Reservations in the `HELD` state can be cancelled by the student, which immediately releases the seat back to the `available_seats` pool.
+- **Cancellable**: Reservations in the `HELD` state can be cancelled by the student, which immediately releases the seat back to the class's available-seat count.
 - **Non-Cancellable**: Once a reservation is `CONFIRMED`, it cannot be cancelled through the standard cancellation API. This ensures that confirmed admissions are final.
 
 ## 4. Reservation Expiry Logic
-- **JIT Cleanup**: Instead of relying solely on a background timer (which can be delayed), the system performs "Just-in-Time" cleanup. When a request to create a new hold for a class arrives, the system first identifies and releases all expired holds for that specific class.
-- **State Transition**: Expired holds are removed from the database to free up the partial unique index (`student_id, class_id`), allowing the student to try again.
+- A hosted backend worker checks for expired reservations every five seconds.
+- API reads and reservation attempts also perform just-in-time expiry so that a delayed worker does not leave stale availability visible or permit late confirmation.
+- Expired reservations remain in history with `EXPIRED` status; a partial unique index allows a student to apply again after expiry.
 
 ## 5. Payment Simulation
 Payment is simulated. The "ভর্তি ফি দিন" (Pay Admission Fee) button triggers the `/confirm` endpoint. If the request is successful, the system assumes payment was completed and transitions the hold to `CONFIRMED`.
 
 ## 6. Class/Shift Representation
-Classes are represented as a single entity `ClassOffering`. The `className` field is intended to store both the grade/subject and the shift (e.g., "Grade 1 - Morning Shift").
+Classes are represented as a single entity `ClassOffering`. Its `name` response field stores both the grade and shift (e.g., "Class 6 - Morning Shift").
 
 ## 7. Concurrency Control
 To prevent overbooking (the "Double Booking" problem), the system uses **Pessimistic Locking** (`SELECT FOR UPDATE`). This ensures that only one transaction can modify the seat count for a specific class at a time, maintaining strict data integrity even under heavy load.

@@ -21,7 +21,7 @@ namespace AdmissionSystem.Api.Controllers
         [HttpGet("holds")]
         public async Task<IActionResult> GetMyHolds([FromHeader(Name = "X-Student-Id")] string studentId)
         {
-            if (string.IsNullOrEmpty(studentId)) return BadRequest("X-Student-Id header is missing.");
+            if (!StudentId.IsValid(studentId)) return BadRequest(new { error = "Valid X-Student-Id header is required (5–50 digits)." });
 
             return Ok(await _admissionService.GetHoldsForStudentAsync(studentId));
         }
