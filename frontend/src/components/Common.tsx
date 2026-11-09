@@ -1,20 +1,29 @@
 import React from 'react';
+import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export const Loading = () => (
-    <div className="flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <div className="flex flex-col items-center justify-center p-12 space-y-4">
+        <Loader2 className="h-10 w-10 text-academic-600 animate-spin" />
+        <p className="text-academic-500 font-medium animate-pulse">Loading your data...</p>
     </div>
 );
 
 export const ErrorMessage = ({ message }: { message: string }) => (
-    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-        <strong className="font-bold">Error: </strong>
-        <span>{message}</span>
+    <div className="flex items-start p-4 mb-6 bg-danger-50 border-l-4 border-danger-500 text-danger-700 rounded-r-lg shadow-sm">
+        <AlertCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+        <div>
+            <p className="font-bold">Something went wrong</p>
+            <p className="text-sm">{message}</p>
+        </div>
     </div>
 );
 
-export const Notification = ({ message, type = 'success' }: { message: string, type?: 'success' | 'error' }) => (
-    <div className={`fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white transition-all ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-        {message}
+export const SuccessMessage = ({ message }: { message: string }) => (
+    <div className="flex items-start p-4 mb-6 bg-success-50 border-l-4 border-success-500 text-success-700 rounded-r-lg shadow-sm">
+        <CheckCircle2 className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+        <div>
+            <p className="font-bold">Success!</p>
+            <p className="text-sm">{message}</p>
+        </div>
     </div>
 );

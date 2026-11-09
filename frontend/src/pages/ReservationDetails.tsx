@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { admissionApi } from '../api/services';
 import { AdmissionHold } from '../types';
-import { Loading, ErrorMessage, Notification } from '../components/Common';
+import { Loading, ErrorMessage } from '../components/Common';
+import { Timer, CheckCircle, XCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 const ReservationDetails = () => {
     const { id } = useParams<{ id: string }>();
@@ -40,13 +43,19 @@ const ReservationDetails = () => {
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
+    const getTimeColor = (seconds: number) => {
+        if (seconds > 300) return 'text-success-600'; // > 5 mins
+        if (seconds > 60) return 'text-warning-500'; // > 1 min
+        return 'text-danger-600'; // < 1 min
+    };
+
     const handleConfirm = async () => {
         try {
             await admissionApi.confirm(id!);
-            alert('Admission Confirmed Successfully!');
+            toast.success('Admission Confirmed Successfully!');
             navigate('/my-applications');
         } catch (err: any) {
-            alert(err.message || 'Confirmation failed');
+            toast.error(err.response?.data?.message || 'Confirmation failed');
         }
     };
 
@@ -54,10 +63,10 @@ const ReservationDetails = () => {
         if (!window.confirm('Are you sure you want to cancel this reservation?')) return;
         try {
             await admissionApi.cancel(id!);
-            alert('Reservation Cancelled');
+            toast.success('Reservation cancelled');
             navigate('/my-applications');
         } catch (err: any) {
-            alert(err.message || 'Cancellation failed');
+            toast.error(err.response?.data?.message || 'Cancellation failed');
         }
     };
 
@@ -68,45 +77,82 @@ const ReservationDetails = () => {
     const isExpired = timeLeft === 0;
 
     return (
-        <div className="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md border border-gray-200">
-            <h2 className="text-2xl font-bold mb-6">Reservation Details</h2>
-            <div className="space-y-4 mb-8">
-                <div className="flex justify-between border-b py-2">
-                    <span className="text-gray-600">Reservation ID:</span>
-                    <span className="font-mono">{hold.id}</span>
-                </div>
-                <div className="flex justify-between border-b py-2">
-                    <span className="text-gray-600">Status:</span>
-                    <span className={`font-bold ${hold.isConfirmed ? 'text-green-600' : isExpired ? 'text-red-600' : 'text-blue-600'}`}>
-                        {hold.isConfirmed ? 'CONFIRMED' : isExpired ? 'EXPIRED' : 'HELD'}
-                    </span>
-                </div>
-                {!hold.isConfirmed && (
-                    <div className="flex justify-between border-b py-2">
-                        <span className="text-gray-600">Expires In:</span>
-                        <span className={`font-mono font-bold ${isExpired ? 'text-red-600' : 'text-gray-900'}`}>
-                            {formatTime(timeLeft || 0)}
-                        </span>
+        <div className="max-w-2xl mx-auto space-y-8">
+            <button
+                onClick={() => navigate(-1)}
+                className="flex items-center text-academic-500 hover:text-academic-800 transition-colors group"
+            >
+                <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+                Back to Dashboard
+            </button>
+
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-3xl shadow-xl border border-academic-200 overflow-hidden"
+            >
+                <div className={`p-8 text-center ${hold.isConfirmed ? 'bg-success-500 text-white' : 'bg-academic-800 text-white'}`}>
+                    <div className="inline-flex p-3 bg-white/20 rounded-full mb-4">
+                        {hold.isConfirmed ? <CheckCircle className="h-8 w-8" /> : <Timer className="h-8 w-8" />}
                     </div>
-                )}
-            </div>
-            <div className="flex space-x-4">
-                {!hold.isConfirmed && !isExpired && (
-                    <button
-                        onClick={handleConfirm}
-                        className="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors"
-                    >
-                        Confirm Admission (ভর্তি ফি দিন)
-                    </button>
-                )}
-                <button
-                    onClick={handleCancel}
-                    disabled={hold.isConfirmed}
-                    className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-300 transition-colors disabled:opacity-50"
-                >
-                    Cancel Reservation
-                </button>
-            </div>
+                    <h2 className="text-3xl font-bold mb-2">
+                        {hold.isConfirmed ? 'Admission Confirmed!' : 'Seat Reserved'}
+                    </h2>
+                    <p className="opacity-90">
+                        {hold.isConfirmed
+                            ? 'Your child is now officially enrolled.'
+                            : 'Please confirm your admission within the time limit.'}
+                    </p>
+                </div>
+
+                <div className="p-8 space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="p-4 bg-academic-50 rounded-2xl border border-academic-100">
+                            <p className="text-xs text-academic-500 uppercase font-bold mb-1">Reservation ID</p>
+                            <p className="font-mono text-sm font-semibold">{hold.id}</p>
+                        </div>
+                        <div className="p-4 bg-academic-50 rounded-2xl border border-academic-100">
+                            <p className="text-xs text-academic-500 uppercase font-bold mb-1">Status</p>
+                            <p className={`font-bold ${hold.isConfirmed ? 'text-success-600' : isExpired ? 'text-danger-600' : 'text-blue-600'}`}>
+                                {hold.isConfirmed ? 'CONFIRMED' : isExpired ? 'EXPIRED' : 'HELD'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {!hold.isConfirmed && (
+                        <div className="flex flex-col items-center justify-center p-6 bg-academic-100 rounded-2xl border-2 border-dashed border-academic-300">
+                            <p className="text-sm text-academic-500 mb-2">Reservation Expires In</p>
+                            <p className={`text-5xl font-black font-mono ${getTimeColor(timeLeft || 0)}`}>
+                                {formatTime(timeLeft || 0)}
+                            </p>
+                            {isExpired && (
+                                <div className="mt-4 flex items-center text-danger-600 font-bold">
+                                    <AlertTriangle className="h-4 w-4 mr-2" />
+                                    This reservation has expired
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                        {!hold.isConfirmed && !isExpired && (
+                            <button
+                                onClick={handleConfirm}
+                                className="flex-1 bg-success-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-success-700 transition-all shadow-lg hover:shadow-success-200 active:scale-95"
+                            >
+                                Confirm Admission (ভর্তি ফি দিন)
+                            </button>
+                        )}
+                        <button
+                            onClick={handleCancel}
+                            disabled={hold.isConfirmed}
+                            className="flex-1 bg-white text-gray-600 border border-gray-300 py-4 rounded-xl font-bold hover:bg-gray-50 transition-all disabled:opacity-50"
+                        >
+                            Cancel Reservation
+                        </button>
+                    </div>
+                </div>
+            </motion.div>
         </div>
     );
 };
