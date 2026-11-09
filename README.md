@@ -1,43 +1,83 @@
 # School Admission System
 
-A Dockerized admission demo for class and shift seat management. Parents can reserve a seat, confirm the simulated admission fee, cancel a hold, and review their applications. Administrators can create offerings and review capacity.
+A complete school admission system built with .NET 8, React, and PostgreSQL, designed to handle high-concurrency seat reservations with first-come-first-served logic and automatic expiry.
 
-## Stack and structure
+## 🚀 Features
+- **Admin Dashboard**: Create and manage class offerings and track overall seat availability.
+- **Guardian Interface**: Identify students, browse available classes, and reserve seats.
+- **Reservation System**: 10-minute holds on seats to prevent overbooking during the confirmation process.
+- **Concurrency Protection**: Row-level locking (`SELECT FOR UPDATE`) to ensure seat counts are always accurate.
+- **Automatic Expiry**: Seats from expired reservations are automatically released back to the pool.
+- **Idempotent Confirmations**: Safe, repeated confirmation requests without duplicating seat counts.
 
-- ASP.NET Core 10 Web API with Entity Framework Core and PostgreSQL
-- React 19 + TypeScript + Vite
-- Docker Compose with persistent PostgreSQL storage
+## 🛠 Technology Stack
+- **Backend**: .NET 8 Web API, Entity Framework Core
+- **Database**: PostgreSQL
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Axios
+- **Testing**: xUnit, FluentAssertions
+- **Infrastructure**: Docker, Docker Compose
 
-```text
-backend/       .NET API and domain model
-frontend/      React application
-docker-compose.yml
-ASSUMPTIONS.md
-AI_USAGE.md
+## 📁 Project Structure
+```
+/
+├── AdmissionSystem.Api/    # Backend Web API
+│   ├── Controllers/        # API Endpoints
+│   ├── Services/           # Business Logic
+│   ├── Data/               # DB Context & Migrations
+│   └── Entities/           # Database Models
+├── AdmissionSystem.Tests/  # Automated Tests
+├── frontend/               # React Frontend
+│   ├── src/api/            # API Client
+│   ├── src/components/     # Reusable UI
+│   └── src/pages/          # Application Pages
+└── docker-compose.yml      # Orchestration
 ```
 
-## Run with Docker
+## 🛠 Setup & Execution
 
-Copy `.env.example` to `.env` if you want to customize settings, then run:
+### Prerequisites
+- [Docker](https://www.docker.com/products/docker-desktop/) installed and running.
 
-```sh
-docker compose up --build
+### Startup Instructions
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd school-admission-system
+   ```
+
+2. Start the entire stack:
+   ```bash
+   docker compose up -d
+   ```
+
+3. Access the application:
+   - **Frontend**: `http://localhost:5173`
+   - **Backend API**: `http://localhost:8080`
+   - **Swagger UI**: `http://localhost:8080/swagger`
+
+## 📡 API Documentation
+All requests to hold/confirm/cancel endpoints require the `X-Student-Id` header.
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/classes` | Create a new class offering |
+| `GET` | `/classes` | List all classes and availability |
+| `GET` | `/classes/{id}` | Get specific class details |
+| `POST` | `/classes/{id}/holds` | Reserve a seat (10m hold) |
+| `GET` | `/holds/{id}` | Check reservation status |
+| `POST` | `/holds/{id}/confirm` | Confirm admission |
+| `DELETE` | `/holds/{id}` | Cancel reservation |
+| `GET` | `/me/holds` | View all student applications |
+
+## 🧪 Testing
+Run automated tests using the .NET CLI:
+```bash
+dotnet test AdmissionSystem.Tests/AdmissionSystem.Tests.csproj
 ```
 
-Open the UI at <http://localhost:3000> and API at <http://localhost:8080>. PostgreSQL data survives container restarts in `postgres_data`. Avoid `docker compose down -v` when you want to keep that data.
-
-## Configuration
-
-`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `HOLD_DURATION_SECONDS` (default 600), and `VITE_API_URL` (default `http://localhost:8080`) can be set in `.env`.
-
-## API
-
-JSON API endpoints: `POST /classes`, `GET /classes`, `GET /classes/{classId}`, `POST /classes/{classId}/holds`, `GET /holds/{holdId}`, `POST /holds/{holdId}/confirm`, `DELETE /holds/{holdId}`, and `GET /me/holds`.
-
-Student operations use `X-Student-Id: 20152691234567890`. Invalid/missing student IDs return 400; unavailable seats and duplicate active applications return 409. Class creation accepts `{ "name": "Class 6 - Morning Shift", "totalSeats": 120 }`.
-
-## Local development
-
-Run PostgreSQL separately, set `DATABASE_URL`, then run `dotnet run --project backend`. For the frontend, run `cd frontend`, `npm install`, and `npm run dev`; set `VITE_API_URL` to the API origin.
-
-Automated tests are not included in this initial scaffold yet.
+## ⚙️ Environment Variables
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | `Host=localhost;...` | PostgreSQL connection string |
+| `VITE_API_URL` | `http://localhost:8080` | Frontend API endpoint |
+| `HOLD_DURATION_SECONDS`| `600` | Duration of seat reservations |

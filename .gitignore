@@ -1,6 +1,11 @@
-**/bin/
-**/obj/
-**/node_modules/
-**/dist/
+# .gitignore
+.vscode/
+.idea/
+bin/
+obj/
+dist/
+node_modules/
 .env
-.DS_Store
+*.user
+*.suo
+appsettings.Development.json

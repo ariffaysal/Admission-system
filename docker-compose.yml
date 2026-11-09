@@ -1,35 +1,45 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:16-alpine
+    container_name: admission-db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-school_admission}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: admission_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-school_admission}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 5
+
   backend:
-    build: ./backend
-    environment:
-      DATABASE_URL: Host=db;Port=5432;Database=${POSTGRES_DB:-school_admission};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
-      HOLD_DURATION_SECONDS: ${HOLD_DURATION_SECONDS:-600}
+    build:
+      context: .
+      dockerfile: AdmissionSystem.Api/Dockerfile
+    container_name: admission-api
     ports:
       - "8080:8080"
+    environment:
+      - DATABASE_URL=Host=db;Database=admission_db;Username=postgres;Password=postgres
     depends_on:
       db:
         condition: service_healthy
+
   frontend:
     build:
       context: ./frontend
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+      dockerfile: Dockerfile
+    container_name: admission-web
     ports:
-      - "3000:80"
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:8080
     depends_on:
       - backend
+
 volumes:
-  postgres_data:
+  pgdata:
